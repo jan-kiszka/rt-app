@@ -8,3 +8,6 @@ if SET_DLSCHED
 rt_app_LDADD += ../libdl/libdl.a
 endif
 dist_bin_SCRIPTS = $(srcdir)/../doc/workgen
+dist_pkgdata_SCRIPTS = $(srcdir)/rt-app-config-helper
+AM_CPPFLAGS += -DRT_APP_HELPERDIR=\"$(pkgdatadir)\"
+dist_pkgdata_DATA = $(srcdir)/rt-app-schema.json

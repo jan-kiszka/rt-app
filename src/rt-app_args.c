@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <getopt.h>
 
 #include "rt-app_parse_config.h"
@@ -64,6 +65,52 @@ struct option long_args[] = {
 	{"log",		required_argument,	0,	'l'},
 	{0,		0,			0,	0}
 };
+
+#define RT_APP_HELPER	"rt-app-config-helper"
+
+static const char *helper_path = RT_APP_HELPERDIR "/" RT_APP_HELPER;
+static const char *helper_cmd = RT_APP_HELPER;
+
+static void handle_sigchld(int sig)
+{
+	int wstatus;
+
+	wait(&wstatus);
+	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus))
+		exit(EXIT_FAILURE);
+}
+
+static void
+spawn_config_helper(const char *filename)
+{
+	int pipe_files[2];
+	pid_t ret;
+
+	close(STDIN_FILENO);
+	if (pipe(pipe_files) < 0) {
+		fprintf(stderr, "Failed to set up pipe for helper\n");
+		exit(EXIT_FAILURE);
+	}
+
+	signal(SIGCHLD, handle_sigchld);
+
+	ret = fork();
+	if (ret == 0) {
+		close(STDOUT_FILENO);
+		dup(pipe_files[1]);
+		if (access(helper_path, R_OK | X_OK) == 0)
+			execl(helper_path, helper_cmd, filename);
+		else
+			execlp(helper_cmd, helper_cmd, filename);
+		fprintf(stderr, "Failed to run helper\n");
+		exit(EXIT_FAILURE);
+	} else if (ret > 0) {
+		close(pipe_files[1]);
+	} else {
+		fprintf(stderr, "Failed to fork helper\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 void
 parse_command_line(int argc, char **argv, rtapp_options_t *opts)
@@ -110,10 +157,20 @@ parse_command_line(int argc, char **argv, rtapp_options_t *opts)
 	if (optind >= argc)
 		usage(NULL, EXIT_INV_COMMANDLINE);
 
-	if (stat(argv[optind], &config_file_stat) == 0)
-		parse_config(argv[optind], opts);
-	else if (strcmp(argv[optind], "-") == 0)
+	if (stat(argv[optind], &config_file_stat) == 0) {
+		char *dot = strrchr(argv[optind], '.');
+
+		if (dot && strcmp(dot, ".yaml") == 0) {
+			int wstatus;
+
+			spawn_config_helper(argv[optind]);
+			parse_config_stdin(opts);
+		} else {
+			parse_config(argv[optind], opts);
+		}
+	} else if (strcmp(argv[optind], "-") == 0) {
 		parse_config_stdin(opts);
-	else
+	} else {
 		usage(NULL, EXIT_FAILURE);
+	}
 }

@@ -1,0 +1,216 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "rt-app configuration",
+    "type": "object",
+    "required": [
+        "tasks"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "global": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "calibration": {
+                    "anyOf": [
+                        { "type": "integer" },
+                        {
+                            "type": "string",
+                            "pattern": "CPU[0-9]+"
+                        }
+                    ]
+                },
+                "default_policy":   { "$ref": "#/$defs/policy" },
+                "duration":         { "type": "integer" },
+                "pi_enabled":       { "type": "boolean" },
+                "lock_pages":       { "type": "boolean" },
+                "logdir":           { "type": "string" },
+                "log_basename":     { "type": "string" },
+                "log_size":         { "type": "string" },
+                "ftrace":           { "type": "string" },
+                "gnuplot":          { "type": "boolean" },
+                "io_device":        { "type": "string" },
+                "mem_buffer_size":  { "type": "integer" },
+                "cumulative_slack": { "type": "boolean" }
+            }
+        },
+        "resources": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [ "type" ],
+                "properties": {
+                    "type": {
+                        "enum": [
+                            "mutex"
+                        ]
+                    },
+                    "protocol": {
+                        "enum": [
+                            "none",
+                            "prio-inherit",
+                            "prio-protect"
+                        ]
+                    },
+                    "ceiling": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "allOf": [
+                    {
+                        "if": {
+                            "not": {
+                                "properties": {
+                                    "type": { "const": "mutex" }
+                                }
+                            }
+                        },
+                        "then": {
+                            "properties": {
+                                "protocol": false
+                            }
+                        }
+                    },
+                    {
+                        "if": {
+                            "allOf": [
+                                {
+                                    "properties": {
+                                        "protocol": { "const": "prio-protect" }
+                                    }
+                                },
+                                {
+                                    "not": {
+                                        "properties": {
+                                            "protocol": false
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "then": {
+                            "required": [ "ceiling" ]
+                        },
+                        "else": {
+                            "properties": {
+                                "ceiling": false
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "tasks": {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/$defs/task-or-phase",
+                "oneOf": [
+                    { "required": [ "phases" ] },
+                    { "required": [ "actions" ] }
+                ],
+                "properties": {
+                    "instance": { "type": "integer" },
+                    "delay":    { "type": "integer" },
+                    "phases": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/$defs/task-or-phase",
+                            "required": [ "actions" ],
+                            "unevaluatedProperties": false
+                        }
+                    }
+                },
+                "unevaluatedProperties": false
+            }
+        }
+    },
+    "$defs": {
+        "policy": {
+            "enum": [
+                "SCHED_OTHER",
+                "SCHED_IDLE",
+                "SCHED_RR",
+                "SCHED_FIFO",
+                "SCHED_DEADLINE"
+            ]
+        },
+        "int-array": {
+            "type": "array",
+            "items": { "type": "integer" }
+        },
+        "cond-block": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "ref":   { "type": "string" },
+                "mutex": { "type": "string" }
+            }
+        },
+        "actions": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "minProperties": 1,
+                        "maxProperties": 1,
+                        "properties": {
+                            "run":          { "type": "integer" },
+                            "runtime":      { "type": "integer" },
+                            "mem":          { "type": "integer" },
+                            "iorun":        { "type": "integer" },
+                            "sleep":        { "type": "integer" },
+                            "lock":         { "type": "string" },
+                            "unlock":       { "type": "string" },
+                            "fork":         { "type": "string" },
+                            "resume":       { "type": "string" },
+                            "cond-signal":  { "type": "string" },
+                            "cond-bcast":   { "type": "string" },
+                            "cond-wait":    { "$ref": "#/$defs/cond-block" },
+                            "cond-sync":    { "$ref": "#/$defs/cond-block" },
+                            "timer": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [ "period" ],
+                                "properties": {
+                                    "ref":    { "type": "string" },
+                                    "period": { "type": "integer" },
+                                    "mode":   {
+                                        "enum": [ "relative", "absolute" ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "enum": [
+                            "exit",
+                            "suspend",
+                            "yield"
+                        ]
+                    }
+                ]
+            }
+        },
+        "task-or-phase": {
+            "type": "object",
+            "properties": {
+                "loop":          { "type": "integer" },
+                "policy":        { "$ref": "#/$defs/policy" },
+                "priority":      { "type": "integer" },
+                "dl-runtime":    { "type": "integer" },
+                "dl-period":     { "type": "integer" },
+                "dl-deadline":   { "type": "integer" },
+                "util_min":      { "type": "integer" },
+                "util_max":      { "type": "integer" },
+                "nodes_membind": { "$ref": "#/$defs/int-array" },
+                "cpus":          { "$ref": "#/$defs/int-array" },
+                "taskgroup":     { "type": "string" },
+                "actions":       { "$ref": "#/$defs/actions" }
+            }
+        }
+    }
+}

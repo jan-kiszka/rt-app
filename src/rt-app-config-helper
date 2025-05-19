@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+
+'''
+This file is part of rt-app
+Copyright (c) Siemens, 2025
+
+SPDX-License-Identifier: GPL-2.0-or-later
+'''
+
+import json
+import os.path
+import sys
+import yaml
+
+from jsonschema.validators import validator_for
+
+
+def convert_actions(phase_or_task):
+    obj_actions = [
+        'run',
+        'runtime',
+        'mem',
+        'iorun',
+        'sleep',
+        'lock',
+        'unlock',
+        'fork',
+        'resume',
+        'cond-signal',
+        'cond-bcast',
+        'cond-wait',
+        'cond-sync',
+        'timer'
+    ]
+    str_actions = [
+        'exit',
+        'suspend',
+        'yield'
+    ]
+
+    def check_renaming(name):
+        rename_actions = [
+            ('cond-signal', 'signal'),
+            ('cond-bcast', 'broad'),
+            ('cond-wait', 'wait'),
+            ('cond-sync', 'sync')
+        ]
+
+        for new, legacy in rename_actions:
+            if name == new:
+                return legacy
+        return name
+
+    counters = {}
+    for action in obj_actions + str_actions:
+        counters[action] = 0
+
+    for action in phase_or_task['actions']:
+        if isinstance(action, str):
+            for str_action in str_actions:
+                if action == str_action:
+                    n = counters.get(str_action)
+                    phase_or_task[f'{str_action}{n}'] = ''
+                    counters[str_action] = n + 1
+                    continue
+        else:
+            for obj_action in obj_actions:
+                if list(action) == [obj_action]:
+                    n = counters.get(obj_action)
+                    renamed = check_renaming(obj_action)
+                    phase_or_task[f'{renamed}{n}'] = action.get(obj_action)
+                    counters[obj_action] = n + 1
+                    continue
+    del phase_or_task['actions']
+
+
+def convert_to_legacy(config):
+    for _, task in config['tasks'].items():
+        if task.get('phases'):
+            for _, phase in task['phases'].items():
+                convert_actions(phase)
+        else:
+            convert_actions(task)
+    return config
+
+
+if __name__ == '__main__':
+    script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+    with open(script_dir + "/rt-app-schema.json") as fds:
+        schema = json.load(fds)
+    with open(sys.argv[1]) as fds:
+        config = yaml.safe_load(fds)
+
+    validator_class = validator_for(schema)
+    validator = validator_class(schema)
+    validation_error = False
+
+    for error in sorted(validator.iter_errors(config), key=str):
+        validation_error = True
+        print('Config file validation Error:\n%s\n' % error.message,
+              file=sys.stderr)
+        print('Validation against this schema failed:\n%s' %
+              json.dumps(error.schema, indent=2), file=sys.stderr)
+
+    if validation_error:
+        sys.exit(1)
+
+    json.dump(convert_to_legacy(config), sys.stdout, indent=2)
+    print()
