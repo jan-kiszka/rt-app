@@ -172,6 +172,20 @@ gettid(void)
 }
 
 int
+string_to_mutex_protocol(const char *protocol_name, int *protocol)
+{
+	if (strcmp(protocol_name, "none") == 0)
+		*protocol = PTHREAD_PRIO_NONE;
+	else if (strcmp(protocol_name, "prio-inherit") == 0)
+		*protocol = PTHREAD_PRIO_INHERIT;
+	else if (strcmp(protocol_name, "prio-protect") == 0)
+		*protocol = PTHREAD_PRIO_PROTECT;
+	else
+		return 1;
+	return 0;
+}
+
+int
 string_to_policy(const char *policy_name, policy_t *policy)
 {
 	if (strcmp(policy_name, "SCHED_OTHER") == 0)

@@ -129,6 +129,9 @@ gettid(void);
 __u64
 timespec_to_nsec(struct timespec *ts);
 
+int
+string_to_mutex_protocol(const char *protocol_name, int *protocol);
+
 char *
 policy_to_string(policy_t policy);
 

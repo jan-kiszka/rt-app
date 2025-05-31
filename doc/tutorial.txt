@@ -24,10 +24,9 @@ before starting the use case.
 
 The json file that describes a workload is made on 3 main objects: tasks,
 resources and global objects. Only tasks object is mandatory; default value will
-be used if global object is not defined and resources object is kept for
-backward compatibility with old version of rt-app but it doesn't give any
-benefit to declare it as the resources are now dynamically created by rt-app
-when it parses the file.
+be used if global object is not defined. The resources object is only needed to
+initialize resources with individual parameters. In most cases, resources are
+dynamically created by rt-app when it parses the file.
 
 **** global object ****
 
@@ -123,6 +122,27 @@ used to create IO-bounded and memory-bounded busy loop. Default value is
 		"mem_buffer_size" : 4194304,
 		"cumulative_slack" : false
 	}
+
+**** resources object ****
+
+The resources object can be used to declare resources upfront which should be
+initialized using additional parameters. All other resources are initialized
+automatically by rt-app when parsing task or phase events.
+
+*** mutex object ***
+
+The mutex object describes the protocol and, where applicable, the priority
+ceiling of the mutex. The mutex with the given parameters can then be used
+in lock, unlock, wait and sync events.
+
+* protocol : String. Use "none" for a normal mutex, "prio-inherit" for a one
+with priority inheritance protocol and "prio-protect" for one that will apply
+the priority protection (or ceiling) protocol. Default is "none".
+
+* ceiling : Integer. Define the ceiling priority of this mutex. While holding
+it, a thread will be lifted to at least this real-time priority. Must be
+greater than 0. This property is required if "prio-protect" has been selected
+as protocol.
 
 **** tasks object ****
 

@@ -160,6 +160,12 @@ typedef struct _rtapp_resource_t {
 	int index;
 	resource_t type;
 	char *name;
+	union {
+		struct {
+			int protocol;
+			int ceiling;
+		};
+	} params;
 } rtapp_resource_t;
 
 typedef struct _rtapp_resources_t {

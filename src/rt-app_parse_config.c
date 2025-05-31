@@ -192,16 +192,38 @@ get_string_value_from(struct json_object *where,
 	return s_value;
 }
 
+static void
+preprare_mutex_resource(rtapp_resource_t *data, struct json_object *obj,
+		const rtapp_options_t *opts)
+{
+	const char *def_proto = opts->pi_enabled ? "prio-inherit" : "none";
+	char *mutex_proto;
+
+	if (obj) {
+		mutex_proto = get_string_value_from(obj, "protocol", TRUE, def_proto);
+		data->params.ceiling = get_int_value_from(obj, "ceiling", TRUE, 0);
+	} else {
+		mutex_proto = strdup(def_proto);
+	}
+	if (string_to_mutex_protocol(mutex_proto, &data->params.protocol) != 0) {
+		log_critical(PIN2 "Invalid mutex protocol %s", mutex_proto);
+		exit(EXIT_INV_CONFIG);
+	}
+	free(mutex_proto);
+}
+
 static void init_mutex_resource(rtapp_resource_t *data, const rtapp_options_t *opts)
 {
 	log_info(PIN3 "Init: %s mutex", data->name);
 
 	pthread_mutexattr_init(&data->res.mtx.attr);
-	if (opts->pi_enabled) {
-		pthread_mutexattr_setprotocol(
+	pthread_mutexattr_setprotocol(
+			&data->res.mtx.attr,
+			data->params.protocol);
+	if (data->params.protocol == PTHREAD_PRIO_PROTECT && data->params.ceiling)
+		pthread_mutexattr_setprioceiling(
 				&data->res.mtx.attr,
-				PTHREAD_PRIO_INHERIT);
-	}
+				data->params.ceiling);
 	pthread_mutex_init(&data->res.mtx.obj,
 			&data->res.mtx.attr);
 }
@@ -259,7 +281,8 @@ static void init_barrier_resource(rtapp_resource_t *data, const rtapp_options_t 
 }
 
 static void
-init_resource_data(const char *name, int type, rtapp_resources_t *resources_table,
+init_resource_data(const char *name, struct json_object *obj, int type,
+		rtapp_resources_t *resources_table,
 		int idx, const rtapp_options_t *opts)
 {
 	rtapp_resource_t *data = &(resources_table->resources[idx]);
@@ -271,6 +294,7 @@ init_resource_data(const char *name, int type, rtapp_resources_t *resources_tabl
 
 	switch (data->type) {
 		case rtapp_mutex:
+			preprare_mutex_resource(data, obj, opts);
 			init_mutex_resource(data, opts);
 			break;
 		case rtapp_timer:
@@ -317,7 +341,7 @@ parse_resource_data(const char *name, struct json_object *obj, int idx,
 	 */
 	free(type);
 
-	init_resource_data(name, data->type, opts->resources, idx, opts);
+	init_resource_data(name, obj, data->type, opts->resources, idx, opts);
 }
 
 static int
@@ -345,7 +369,7 @@ add_resource_data(const char *name, int type, rtapp_resources_t **resources_tabl
 	 * We can't reuse table as *resources_table might have changed following
 	 * realloc
 	 */
-	init_resource_data(name, type, *resources_table, idx, opts);
+	init_resource_data(name, NULL, type, *resources_table, idx, opts);
 
 	return idx;
 }
