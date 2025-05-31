@@ -578,6 +578,8 @@ special meaning for SCHED_DEADLINE tasks. String can be empty.
 at any point of time using this event. The name of the forked task must match
 one of the defined tasks.
 
+* exit: String. Terminate rt-app properly. String is ignored.
+
 **** Trace and Log ****
 
 Some traces and log hooks have been added to ease the debug and monitor various

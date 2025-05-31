@@ -704,6 +704,13 @@ parse_task_event_data(char *name, struct json_object *obj,
 		return;
 	}
 
+	if (!strncmp(name, "exit", strlen("exit"))) {
+		data->type = rtapp_exit;
+		log_info(PIN2 "type %d", data->type);
+		strncpy(data->name, name, sizeof(data->name)-1);
+		return;
+	}
+
 	log_error(PIN2 "Resource %s not found in the resource section !!!", ref);
 	log_error(PIN2 "Please check the resource name or the resource section");
 
@@ -730,6 +737,7 @@ static char *events[] = {
 	"yield",
 	"barrier",
 	"fork",
+	"exit",
 	NULL
 };
 

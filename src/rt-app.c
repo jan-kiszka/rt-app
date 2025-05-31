@@ -409,6 +409,8 @@ static void memload(unsigned long count, struct _rtapp_iomem_buf *iomem)
 	}
 }
 
+static void __shutdown(bool force_terminate);
+
 static int run_event(event_data_t *event, int dry_run,
 		unsigned long *perf, thread_data_t *tdata,
 		struct timespec *t_first, log_data_t *ldata)
@@ -632,6 +634,13 @@ static int run_event(event_data_t *event, int dry_run,
 			running_threads = nthreads;
 
 			pthread_mutex_unlock(&fork_mutex);
+		}
+		break;
+	case rtapp_exit:
+		{
+			log_debug("exit");
+			__shutdown(true);
+			pthread_exit(NULL);
 		}
 		break;
 	default:

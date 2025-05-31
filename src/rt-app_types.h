@@ -92,7 +92,8 @@ typedef enum resource_t
 	rtapp_runtime,
 	rtapp_yield,
 	rtapp_barrier,
-	rtapp_fork
+	rtapp_fork,
+	rtapp_exit
 } resource_t;
 
 struct _rtapp_mutex {
