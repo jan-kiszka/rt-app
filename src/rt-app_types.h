@@ -38,6 +38,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <numa.h>
 #endif
 
+#if HAVE_LIBCOBALT
+#include <cobalt/sched.h>
+#endif
+
 #define RTAPP_POLICY_DESCR_LENGTH 16
 #define RTAPP_RESOURCE_DESCR_LENGTH 16
 #define RTAPP_FTRACE_PATH_LENGTH 256
@@ -61,6 +65,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 struct _thread_data_t;
 
+#define SCHED_CLASS_XN3		0x10000000
+
 typedef enum policy_t
 {
 	other = SCHED_OTHER,
@@ -68,6 +74,15 @@ typedef enum policy_t
 	rr = SCHED_RR,
 	fifo = SCHED_FIFO,
 	deadline = SCHED_DEADLINE,
+#if HAVE_LIBCOBALT
+	xn3_other = SCHED_OTHER | SCHED_CLASS_XN3,
+	xn3_weak = SCHED_WEAK | SCHED_CLASS_XN3,
+	xn3_rr = SCHED_RR | SCHED_CLASS_XN3,
+	xn3_fifo = SCHED_FIFO | SCHED_CLASS_XN3,
+	xn3_sporadic = SCHED_SPORADIC | SCHED_CLASS_XN3,
+	xn3_tp = SCHED_TP | SCHED_CLASS_XN3,
+	xn3_quota = SCHED_QUOTA | SCHED_CLASS_XN3,
+#endif
 	same = -1
 } policy_t;
 
@@ -93,7 +108,17 @@ typedef enum resource_t
 	rtapp_yield,
 	rtapp_barrier,
 	rtapp_fork,
-	rtapp_exit
+	rtapp_exit,
+#if HAVE_LIBCOBALT
+	rtapp_xn3_mutex,
+	rtapp_xn3_sleep,
+	rtapp_xn3_lock,
+	rtapp_xn3_unlock,
+	rtapp_xn3_cond_wait,
+	rtapp_xn3_cond_signal,
+	rtapp_xn3_cond_broadcast,
+	rtapp_xn3_cond_sig_and_wait,
+#endif
 } resource_t;
 
 struct _rtapp_mutex {

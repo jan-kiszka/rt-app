@@ -214,8 +214,6 @@ preprare_mutex_resource(rtapp_resource_t *data, struct json_object *obj,
 
 static void init_mutex_resource(rtapp_resource_t *data, const rtapp_options_t *opts)
 {
-	log_info(PIN3 "Init: %s mutex", data->name);
-
 	pthread_mutexattr_init(&data->res.mtx.attr);
 	pthread_mutexattr_setprotocol(
 			&data->res.mtx.attr,
@@ -224,6 +222,15 @@ static void init_mutex_resource(rtapp_resource_t *data, const rtapp_options_t *o
 		pthread_mutexattr_setprioceiling(
 				&data->res.mtx.attr,
 				data->params.ceiling);
+#if HAVE_LIBCOBALT
+	if (data->type == rtapp_xn3_mutex) {
+		log_info(PIN3 "Init: %s mutex (Xenomai 3)", data->name);
+		__COBALT(pthread_mutex_init(&data->res.mtx.obj,
+				&data->res.mtx.attr));
+		return;
+	}
+#endif
+	log_info(PIN3 "Init: %s mutex", data->name);
 	pthread_mutex_init(&data->res.mtx.obj,
 			&data->res.mtx.attr);
 }
@@ -237,9 +244,17 @@ static void init_timer_resource(rtapp_resource_t *data, const rtapp_options_t *o
 
 static void init_cond_resource(rtapp_resource_t *data, const rtapp_options_t *opts)
 {
-	log_info(PIN3 "Init: %s wait", data->name);
-
 	pthread_condattr_init(&data->res.cond.attr);
+#if HAVE_LIBCOBALT
+	if (data->type == rtapp_xn3_cond_wait) {
+		log_info(PIN3 "Init: %s wait (Xenomai 3)", data->name);
+
+		__COBALT(pthread_cond_init(&data->res.cond.obj,
+				&data->res.cond.attr));
+		return;
+	}
+#endif
+	log_info(PIN3 "Init: %s wait", data->name);
 	pthread_cond_init(&data->res.cond.obj,
 			&data->res.cond.attr);
 }
@@ -294,6 +309,9 @@ init_resource_data(const char *name, struct json_object *obj, int type,
 
 	switch (data->type) {
 		case rtapp_mutex:
+#if HAVE_LIBCOBALT
+		case rtapp_xn3_mutex:
+#endif
 			preprare_mutex_resource(data, obj, opts);
 			init_mutex_resource(data, opts);
 			break;
@@ -302,6 +320,9 @@ init_resource_data(const char *name, struct json_object *obj, int type,
 			init_timer_resource(data, opts);
 			break;
 		case rtapp_wait:
+#if HAVE_LIBCOBALT
+		case rtapp_xn3_cond_wait:
+#endif
 			init_cond_resource(data, opts);
 			break;
 		case rtapp_mem:
@@ -450,12 +471,16 @@ parse_task_event_data(char *name, struct json_object *obj,
 	rtapp_resource_t *rdata, *ddata;
 	char unique_name[22];
 	const char *ref;
-	char *tmp;
+	char *tmp, *tmp2;
 	long tag = (long)tdata;
 	int i;
 
 	if (!strncmp(name, "run", strlen("run")) ||
-			!strncmp(name, "sleep", strlen("sleep"))) {
+			!strncmp(name, "sleep", strlen("sleep"))
+#if HAVE_LIBCOBALT
+			|| !strncmp(name, "xn3-sleep", strlen("xn3-sleep"))
+#endif
+			) {
 
 		if (!json_object_is_type(obj, json_type_int))
 			goto unknown_event;
@@ -464,6 +489,10 @@ parse_task_event_data(char *name, struct json_object *obj,
 
 		if (!strncmp(name, "sleep", strlen("sleep")))
 			data->type = rtapp_sleep;
+#if HAVE_LIBCOBALT
+		else if (!strncmp(name, "xn3-sleep", strlen("xn3-sleep")))
+			data->type = rtapp_xn3_sleep;
+#endif
 		else if (!strncmp(name, "runtime", strlen("runtime")))
 			data->type = rtapp_runtime;
 		else
@@ -502,20 +531,34 @@ parse_task_event_data(char *name, struct json_object *obj,
 	}
 
 	if (!strncmp(name, "lock", strlen("lock")) ||
-			!strncmp(name, "unlock", strlen("unlock"))) {
+			!strncmp(name, "unlock", strlen("unlock"))
+#if HAVE_LIBCOBALT
+			|| !strncmp(name, "xn3-lock", strlen("xn3-lock"))
+			|| !strncmp(name, "xn3-unlock", strlen("xn3-unlock"))
+#endif
+			) {
 
 		if (!json_object_is_type(obj, json_type_string))
 			goto unknown_event;
 
 		ref = json_object_get_string(obj);
-		i = get_resource_index(ref, rtapp_mutex, resources_table, opts);
-
+#if HAVE_LIBCOBALT
+		if (!strncmp(name, "xn3-", strlen("xn3-"))) {
+			i = get_resource_index(ref, rtapp_xn3_mutex, resources_table, opts);
+			if (!strncmp(name, "xn3-lock", strlen("xn3-lock")))
+				data->type = rtapp_xn3_lock;
+			else
+				data->type = rtapp_xn3_unlock;
+		} else
+#endif
+		{
+			i = get_resource_index(ref, rtapp_mutex, resources_table, opts);
+			if (!strncmp(name, "lock", strlen("lock")))
+				data->type = rtapp_lock;
+			else
+				data->type = rtapp_unlock;
+		}
 		data->res = i;
-
-		if (!strncmp(name, "lock", strlen("lock")))
-			data->type = rtapp_lock;
-		else
-			data->type = rtapp_unlock;
 
 		rdata = &((*resources_table)->resources[data->res]);
 
@@ -526,19 +569,33 @@ parse_task_event_data(char *name, struct json_object *obj,
 	}
 
 	if (!strncmp(name, "signal", strlen("signal")) ||
-			!strncmp(name, "broad", strlen("broad"))) {
-
-		if (!strncmp(name, "signal", strlen("signal")))
-			data->type = rtapp_signal;
-		else
-			data->type = rtapp_broadcast;
+			!strncmp(name, "broad", strlen("broad"))
+#if HAVE_LIBCOBALT
+			|| !strncmp(name, "xn3-cond-signal", strlen("xn3-cond-signal"))
+			|| !strncmp(name, "xn3-cond-bcast", strlen("xn3-cond-bcast"))
+#endif
+			) {
 
 		if (!json_object_is_type(obj, json_type_string))
 			goto unknown_event;
 
 		ref = json_object_get_string(obj);
-		i = get_resource_index(ref, rtapp_wait, resources_table, opts);
-
+#if HAVE_LIBCOBALT
+		if (!strncmp(name, "xn3-", strlen("xn3-"))) {
+			i = get_resource_index(ref, rtapp_xn3_cond_wait, resources_table, opts);
+			if (!strncmp(name, "xn3-cond-signal", strlen("xn3-cond-signal")))
+				data->type = rtapp_xn3_cond_signal;
+			else
+				data->type = rtapp_xn3_cond_broadcast;
+		} else
+#endif
+		{
+			i = get_resource_index(ref, rtapp_wait, resources_table, opts);
+			if (!strncmp(name, "signal", strlen("signal")))
+				data->type = rtapp_signal;
+			else
+				data->type = rtapp_broadcast;
+		}
 		data->res = i;
 
 		rdata = &((*resources_table)->resources[data->res]);
@@ -550,32 +607,41 @@ parse_task_event_data(char *name, struct json_object *obj,
 	}
 
 	if (!strncmp(name, "wait", strlen("wait")) ||
-			!strncmp(name, "sync", strlen("sync"))) {
-
-		if (!strncmp(name, "wait", strlen("wait")))
-			data->type = rtapp_wait;
-		else
-			data->type = rtapp_sig_and_wait;
+			!strncmp(name, "sync", strlen("sync"))
+#if HAVE_LIBCOBALT
+			|| !strncmp(name, "xn3-cond-wait", strlen("xn3-cond-wait"))
+			|| !strncmp(name, "xn3-cond-sync", strlen("xn3-cond-sync"))
+#endif
+			) {
 
 		tmp = get_string_value_from(obj, "ref", TRUE, "unknown");
-		i = get_resource_index(tmp, rtapp_wait, resources_table, opts);
+		tmp2 = get_string_value_from(obj, "mutex", TRUE, "unknown");
+
+#if HAVE_LIBCOBALT
+		if (!strncmp(name, "xn3-", strlen("xn3-"))) {
+			data->res = get_resource_index(tmp, rtapp_xn3_cond_wait, resources_table, opts);
+			data->dep = get_resource_index(tmp2, rtapp_xn3_mutex, resources_table, opts);
+			if (!strncmp(name, "xn3-cond-wait", strlen("xn3-cond-wait")))
+				data->type = rtapp_xn3_cond_wait;
+			else
+				data->type = rtapp_xn3_cond_sig_and_wait;
+		} else
+#endif
+		{
+			data->res = get_resource_index(tmp, rtapp_wait, resources_table, opts);
+			data->dep = get_resource_index(tmp2, rtapp_mutex, resources_table, opts);
+			if (!strncmp(name, "wait", strlen("wait")))
+				data->type = rtapp_wait;
+			else
+				data->type = rtapp_sig_and_wait;
+		}
+
 		/*
 		 * get_string_value_from allocate the string so with have to free it
 		 * once useless
 		 */
 		free(tmp);
-
-		data->res = i;
-
-		tmp = get_string_value_from(obj, "mutex", TRUE, "unknown");
-		i = get_resource_index(tmp, rtapp_mutex, resources_table, opts);
-		/*
-		 * get_string_value_from allocate the string so with have to free it
-		 * once useless
-		 */
-		free(tmp);
-
-		data->dep = i;
+		free(tmp2);
 
 		rdata = &((*resources_table)->resources[data->res]);
 		ddata = &((*resources_table)->resources[data->dep]);
@@ -762,6 +828,15 @@ static char *events[] = {
 	"barrier",
 	"fork",
 	"exit",
+#if HAVE_LIBCOBALT
+	"xn3-lock",
+	"xn3-unlock",
+	"xn3-sleep",
+	"xn3-cond-signal",
+	"xn3-cond-bcast",
+	"xn3-cond-wait",
+	"xn3-cond-sync",
+#endif
 	NULL
 };
 
@@ -858,6 +933,20 @@ static void parse_numa_data(struct json_object *obj, numaset_data_t *data)
 	}
 }
 
+#if HAVE_LIBCOBALT
+#include <xenomai/init.h>
+
+static pthread_once_t xn3_init;
+
+static void init_xenomai_3(void)
+{
+	char *const *argv = NULL;
+	int argc = 0;
+
+	xenomai_init(&argc, &argv);
+}
+#endif
+
 static sched_data_t *parse_sched_data(struct json_object *obj, int def_policy)
 {
 	sched_data_t tmp_data = { .policy = same };
@@ -877,6 +966,11 @@ static sched_data_t *parse_sched_data(struct json_object *obj, int def_policy)
 		}
 	}
 
+#if HAVE_LIBCOBALT
+	if (tmp_data.policy & SCHED_CLASS_XN3)
+		pthread_once(&xn3_init, init_xenomai_3);
+#endif
+
 	/* Get priority */
 	switch (tmp_data.policy) {
 	case same:
@@ -884,10 +978,21 @@ static sched_data_t *parse_sched_data(struct json_object *obj, int def_policy)
 		break;
 	case other:
 	case idle:
+#if HAVE_LIBCOBALT
+	case xn3_other:
+	case xn3_weak:
+#endif
 		prior_def = DEFAULT_THREAD_NICE;
 		break;
 	case fifo:
 	case rr:
+#if HAVE_LIBCOBALT
+	case xn3_fifo:
+	case xn3_rr:
+	case xn3_sporadic:
+	case xn3_tp:
+	case xn3_quota:
+#endif
 		prior_def = DEFAULT_THREAD_PRIORITY;
 		break;
 	case deadline:

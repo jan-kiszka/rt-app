@@ -198,6 +198,24 @@ string_to_policy(const char *policy_name, policy_t *policy)
 		*policy =  fifo;
 	else if (strcmp(policy_name, "SCHED_DEADLINE") == 0)
 		*policy =  deadline;
+#if HAVE_LIBCOBALT
+	else if (strcmp(policy_name, "XN3_SCHED_OTHER") == 0)
+		*policy = xn3_other;
+	else if (strcmp(policy_name, "XN3_SCHED_WEAK") == 0)
+		*policy = xn3_weak;
+// TODO
+/*	else if (strcmp(policy_name, "XN3_SCHED_RR") == 0)
+		*policy = xn3_rr;*/
+	else if (strcmp(policy_name, "XN3_SCHED_FIFO") == 0)
+		*policy = xn3_fifo;
+// TODO
+/*	else if (strcmp(policy_name, "XN3_SCHED_SPORADIC") == 0)
+		*policy = xn3_sporadic;
+	else if (strcmp(policy_name, "XN3_SCHED_TP") == 0)
+		*policy = xn3_tp;
+	else if (strcmp(policy_name, "XN3_SCHED_QUOTA") == 0)
+		*policy = xn3_quota;*/
+#endif
 	else
 		return 1;
 	return 0;
@@ -217,6 +235,22 @@ policy_to_string(policy_t policy)
 			return "SCHED_FIFO";
 		case deadline:
 			return "SCHED_DEADLINE";
+#if HAVE_LIBCOBALT
+		case xn3_other:
+			return "XN3_SCHED_OTHER";
+		case xn3_weak:
+			return "XN3_SCHED_WEAK";
+		case xn3_rr:
+			return "XN3_SCHED_RR";
+		case xn3_fifo:
+			return "XN3_SCHED_FIFO";
+		case xn3_sporadic:
+			return "XN3_SCHED_SPORADIC";
+		case xn3_tp:
+			return "XN3_SCHED_TP";
+		case xn3_quota:
+			return "XN3_SCHED_QUOTA";
+#endif
 		default:
 			return NULL;
 	}
@@ -242,6 +276,20 @@ string_to_resource(const char *name, resource_t *resource)
 		*resource = rtapp_run;
 	else if (strcmp(name, "timer") == 0)
 		*resource = rtapp_timer;
+#if HAVE_LIBCOBALT
+	else if (strcmp(name, "xn3-mutex") == 0)
+		*resource = rtapp_xn3_mutex;
+	else if (strcmp(name, "xn3-cond-signal") == 0)
+		*resource = rtapp_xn3_cond_signal;
+	else if (strcmp(name, "xn3-cond-wait") == 0)
+		*resource = rtapp_xn3_cond_wait;
+	else if (strcmp(name, "xn3-cond-broadcast") == 0)
+		*resource = rtapp_xn3_cond_broadcast;
+	else if (strcmp(name, "xn3-cond-sync") == 0)
+		*resource = rtapp_xn3_cond_sig_and_wait;
+	else if (strcmp(name, "xn3-sleep") == 0)
+		*resource = rtapp_xn3_sleep;
+#endif
 	else
 		return 1;
 	return 0;
@@ -278,6 +326,23 @@ resource_to_string(resource_t resource, char *resource_name)
 		case rtapp_barrier:
 			strcpy(resource_name, "barrier");
 			break;
+#if HAVE_LIBCOBALT
+		case rtapp_xn3_mutex:
+			strcpy(resource_name, "xn3-mutex");
+			break;
+		case rtapp_xn3_cond_wait:
+			strcpy(resource_name, "xn3-cond-wait");
+			break;
+		case rtapp_xn3_cond_signal:
+			strcpy(resource_name, "xn3-cond-signal");
+			break;
+		case rtapp_xn3_cond_broadcast:
+			strcpy(resource_name, "xn3-cond-broadcast");
+			break;
+		case rtapp_xn3_cond_sig_and_wait:
+			strcpy(resource_name, "xn3-cond-sync");
+			break;
+#endif
 		default:
 			return 1;
 	}

@@ -30,7 +30,14 @@ def convert_actions(phase_or_task):
         'cond-bcast',
         'cond-wait',
         'cond-sync',
-        'timer'
+        'timer',
+        'xn3-sleep',
+        'xn3-lock',
+        'xn3-unlock',
+        'xn3-cond-signal',
+        'xn3-cond-bcast',
+        'xn3-cond-wait',
+        'xn3-cond-sync',
     ]
     str_actions = [
         'exit',

@@ -43,7 +43,8 @@
                 "properties": {
                     "type": {
                         "enum": [
-                            "mutex"
+                            "mutex",
+                            "xn3-mutex"
                         ]
                     },
                     "protocol": {
@@ -63,7 +64,9 @@
                         "if": {
                             "not": {
                                 "properties": {
-                                    "type": { "const": "mutex" }
+                                    "type": {
+                                        "enum": [ "mutex", "xn3-mutex" ]
+                                    }
                                 }
                             }
                         },
@@ -133,7 +136,14 @@
                 "SCHED_IDLE",
                 "SCHED_RR",
                 "SCHED_FIFO",
-                "SCHED_DEADLINE"
+                "SCHED_DEADLINE",
+                "XN3_SCHED_OTHER",
+                "XN3_SCHED_WEAK",
+                "XN3_SCHED_RR",
+                "XN3_SCHED_FIFO",
+                "XN3_SCHED_SPORADIC",
+                "XN3_SCHED_TP",
+                "XN3_SCHED_QUOTA"
             ]
         },
         "int-array": {
@@ -158,19 +168,19 @@
                         "minProperties": 1,
                         "maxProperties": 1,
                         "properties": {
-                            "run":          { "type": "integer" },
-                            "runtime":      { "type": "integer" },
-                            "mem":          { "type": "integer" },
-                            "iorun":        { "type": "integer" },
-                            "sleep":        { "type": "integer" },
-                            "lock":         { "type": "string" },
-                            "unlock":       { "type": "string" },
-                            "fork":         { "type": "string" },
-                            "resume":       { "type": "string" },
-                            "cond-signal":  { "type": "string" },
-                            "cond-bcast":   { "type": "string" },
-                            "cond-wait":    { "$ref": "#/$defs/cond-block" },
-                            "cond-sync":    { "$ref": "#/$defs/cond-block" },
+                            "run":         { "type": "integer" },
+                            "runtime":     { "type": "integer" },
+                            "mem":         { "type": "integer" },
+                            "iorun":       { "type": "integer" },
+                            "sleep":       { "type": "integer" },
+                            "lock":        { "type": "string" },
+                            "unlock":      { "type": "string" },
+                            "fork":        { "type": "string" },
+                            "resume":      { "type": "string" },
+                            "cond-signal": { "type": "string" },
+                            "cond-bcast":  { "type": "string" },
+                            "cond-wait":   { "$ref": "#/$defs/cond-block" },
+                            "cond-sync":   { "$ref": "#/$defs/cond-block" },
                             "timer": {
                                 "type": "object",
                                 "additionalProperties": false,
@@ -182,7 +192,14 @@
                                         "enum": [ "relative", "absolute" ]
                                     }
                                 }
-                            }
+                            },
+                            "xn3-sleep":       { "type": "integer" },
+                            "xn3-lock":        { "type": "string" },
+                            "xn3-unlock":      { "type": "string" },
+                            "xn3-cond-signal": { "type": "string" },
+                            "xn3-cond-bcast":  { "type": "string" },
+                            "xn3-cond-wait":   { "$ref": "#/$defs/cond-block" },
+                            "xn3-cond-sync":   { "$ref": "#/$defs/cond-block" }
                         }
                     },
                     {

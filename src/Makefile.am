@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4
-AM_CPPFLAGS = -I$(srcdir)/../libdl/
+AM_CPPFLAGS = -I$(srcdir)/../libdl/ -I$(includedir)/cobalt
 bin_PROGRAMS = rt-app
 rt_app_SOURCES= rt-app_types.h rt-app_args.h rt-app_utils.h rt-app_utils.c rt-app_args.c rt-app.h  rt-app.c 
 rt_app_SOURCES += rt-app_parse_config.h rt-app_parse_config.c rt-app_taskgroups.h rt-app_taskgroups.c

@@ -432,6 +432,18 @@ static int run_event(event_data_t *event, int dry_run,
 		pthread_mutex_unlock(&(rdata->res.mtx.obj));
 		lock = -1;
 		break;
+#if HAVE_LIBCOBALT
+	case rtapp_xn3_lock:
+		log_debug("lock (Xenomai 3) %s ", rdata->name);
+		__COBALT(pthread_mutex_lock(&(rdata->res.mtx.obj)));
+		lock = 1;
+		break;
+	case rtapp_xn3_unlock:
+		log_debug("unlock (Xenomai 3) %s ", rdata->name);
+		__COBALT(pthread_mutex_unlock(&(rdata->res.mtx.obj)));
+		lock = -1;
+		break;
+#endif
 	default:
 		break;
 	}
@@ -643,6 +655,32 @@ static int run_event(event_data_t *event, int dry_run,
 			pthread_exit(NULL);
 		}
 		break;
+#if HAVE_LIBCOBALT
+	case rtapp_xn3_sleep:
+		{
+		struct timespec sleep = usec_to_timespec(event->duration);
+		log_debug("sleep (Xenomai 3) %d ", event->duration);
+		__COBALT(nanosleep(&sleep, NULL));
+		}
+		break;
+	case rtapp_xn3_cond_signal:
+		log_debug("condition signal (Xenomai 3) %s ", rdata->name);
+		__COBALT(pthread_cond_signal(&(rdata->res.cond.obj)));
+		break;
+	case rtapp_xn3_cond_broadcast:
+		log_debug("condition broadcast (Xenomai 3) %s ", rdata->name);
+		__COBALT(pthread_cond_broadcast(&(rdata->res.cond.obj)));
+		break;
+	case rtapp_xn3_cond_wait:
+		log_debug("condition wait (Xenomai 3) %s ", rdata->name);
+		__COBALT(pthread_cond_wait(&(rdata->res.cond.obj), &(ddata->res.mtx.obj)));
+		break;
+	case rtapp_xn3_cond_sig_and_wait:
+		log_debug("condition signal and wait (Xenomai 3) %s", rdata->name);
+		__COBALT(pthread_cond_signal(&(rdata->res.cond.obj)));
+		__COBALT(pthread_cond_wait(&(rdata->res.cond.obj), &(ddata->res.mtx.obj)));
+		break;
+#endif
 	default:
 		break;
 	}
@@ -1117,6 +1155,28 @@ static void _set_thread_uclamp(thread_data_t *data, sched_data_t *sched_data)
 	}
 }
 
+#if HAVE_LIBCOBALT
+static void _set_thread_sched_xn3(thread_data_t *data, sched_data_t *sched_data)
+{
+	struct sched_param_ex sa_params = {
+		.sched_priority = sched_data->prio
+	};
+	int ret;
+
+	ret = pthread_setschedparam_ex(pthread_self(),
+				       sched_data->policy & ~SCHED_CLASS_XN3,
+				       &sa_params);
+	if (ret) {
+		log_critical("[%d] pthread_setschedparam_ex returned %d",
+			     data->ind, ret);
+		errno = ret;
+		perror("pthread_setschedparam_ex");
+		exit(EXIT_FAILURE);
+	}
+	__log_policy_priority_change(data, sched_data);
+}
+#endif
+
 static void set_thread_param(thread_data_t *data, sched_data_t *sched_data)
 {
 	if (!sched_data)
@@ -1144,6 +1204,17 @@ static void set_thread_param(thread_data_t *data, sched_data_t *sched_data)
 		case deadline:
 			_set_thread_deadline(data, sched_data);
 			break;
+#if HAVE_LIBCOBALT
+		case xn3_other:
+		case xn3_weak:
+		case xn3_rr:
+		case xn3_fifo:
+		case xn3_sporadic:
+		case xn3_tp:
+		case xn3_quota:
+			_set_thread_sched_xn3(data, sched_data);
+			break;
+#endif
 		default:
 			log_error("Unknown scheduling policy %d",
 				  sched_data->policy);
@@ -1263,6 +1334,15 @@ void *thread_body(void *arg)
 	 * log_idx      - index of current row in the log buffer
 	 */
 	phase = phase_loop = thread_loop = log_idx = 0;
+
+#if HAVE_LIBCOBALT
+	if ((data->sched_data->policy & SCHED_CLASS_XN3) &&
+	    (data->sched_data->policy != xn3_other ||
+	     data->sched_data->policy != xn3_weak)) {
+		set_thread_affinity(data, &pdata->cpu_data);
+		__COBALT(sleep(0));
+	}
+#endif
 
 	/* The following is executed for each phase. */
 	while (continue_running && thread_loop != data->loop) {
